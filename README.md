@@ -10,16 +10,6 @@ outcome.
 **All speech runs on OpenAI**: `/v1/audio/speech` for the agent's voice, `/v1/audio/transcriptions`
 for turning the customer's recording into text.
 
-## Contents
-
-| Document | What it covers |
-|----------|----------------|
-| This README | Setup, APIs, configuration, troubleshooting |
-| [docs/INTERVIEW_GUIDE.md](docs/INTERVIEW_GUIDE.md) | Architecture, design decisions, walkthrough and likely interview questions |
-| [docs/DATABASE.md](docs/DATABASE.md) | Tables, columns, relationships |
-| [docs/SAMPLE_CONVERSATION.md](docs/SAMPLE_CONVERSATION.md) | Real request/response transcripts of complete calls |
-| `postman/` | Postman collection for every endpoint |
-
 ## Features
 
 - Lead CRUD backed by H2 (create, list, detail with call history, update, delete)

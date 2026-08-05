@@ -40,14 +40,6 @@ Check which models the key may actually use, because projects are often limited 
 curl https://api.openai.com/v1/models -H "Authorization: Bearer $OPENAI_API_KEY"
 ```
 
-The list must contain a speech model (`gpt-4o-mini-tts`, `tts-1`) and something that can hear.
-Either family works for listening, and the app picks the endpoint from the model name:
-
-| If the key has | Set | Endpoint used |
-|----------------|-----|---------------|
-| `gpt-audio-mini`, `gpt-audio`, `gpt-4o-audio-preview` | `OPENAI_STT_MODEL=gpt-audio-mini` (the default) | `/v1/chat/completions` |
-| `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1` | `OPENAI_STT_MODEL=gpt-4o-mini-transcribe` | `/v1/audio/transcriptions` |
-
 Choosing a model the project lacks returns HTTP 403 `model_not_found`, which the app reports with
 the exact command above rather than as a key problem.
 

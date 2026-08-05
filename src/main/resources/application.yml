@@ -1,0 +1,69 @@
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: text/html,text/css,application/javascript,application/json
+    min-response-size: 1024
+
+spring:
+  application:
+    name: ai-calling-agent
+  datasource:
+    url: jdbc:h2:file:./data/flowzo-calling;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # The single-page UI changes with every build; a cached copy silently hides the fix.
+          no-cache: true
+
+app:
+  storage:
+    audio-dir: ./storage/audio
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    base-url: https://api.openai.com/v1
+    # The endpoint follows the model name: names containing "audio" (gpt-audio-mini,
+    # gpt-4o-audio-preview) send the recording to /chat/completions, everything else
+    # (gpt-4o-mini-transcribe, gpt-4o-transcribe, whisper-1) to /audio/transcriptions.
+    # Pick one the project is entitled to — see the models list in the README.
+    stt-model: ${OPENAI_STT_MODEL:gpt-audio-mini}
+    tts-model: ${OPENAI_TTS_MODEL:gpt-4o-mini-tts}
+    # alloy, ash, ballad, coral, echo, fable, onyx, nova, sage, shimmer, verse
+    tts-voice: alloy
+    # only gpt-4o-mini-tts accepts instructions; blank this out for tts-1 / tts-1-hd
+    tts-instructions: "Speak as a warm, professional customer-support agent: clear, friendly and unhurried."
+    # ISO-639-1 transcription hint; leave blank to let the model detect the language
+    language: en
+  # Blank keeps audio URLs relative, so they work on any host or port.
+  # Set an absolute URL only when clients run on a different origin.
+  public-base-url: ${PUBLIC_BASE_URL:}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.flowzo.callingagent: INFO

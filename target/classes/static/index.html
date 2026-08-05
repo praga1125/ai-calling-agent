@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Calling Agent</title>
+  <style>
+    :root {
+      --bg: #0e151f;
+      --card: #16212e;
+      --card-2: #1b2836;
+      --ink: #e9eff6;
+      --muted: #93a5b8;
+      --accent: #2bb673;
+      --blue: #4a90e2;
+      --danger: #e35d6a;
+      --line: rgba(255, 255, 255, .09);
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+
+    /* ---------- header ---------- */
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    h1 { margin: 0; font-size: 1.5rem; letter-spacing: -.01em; }
+    .sub { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+
+    /* Only rendered when speech is misconfigured; a healthy setup shows nothing. */
+    .warning {
+      border: 1px solid rgba(227, 93, 106, .45);
+      background: rgba(227, 93, 106, .12);
+      color: #f19aa2;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-bottom: 16px;
+    }
+
+    /* ---------- layout ---------- */
+
+    .layout {
+      display: grid;
+      grid-template-columns: 330px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .09em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .sep { border: none; border-top: 1px solid var(--line); margin: 16px 0; }
+
+    /* ---------- form controls ---------- */
+
+    label {
+      display: block;
+      font-size: .78rem;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    input, select {
+      width: 100%;
+      border-radius: 9px;
+      border: 1px solid var(--line);
+      background: #0c131c;
+      color: var(--ink);
+      padding: 9px 11px;
+      font: inherit;
+      font-size: .92rem;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--blue); }
+    input:disabled { opacity: .45; cursor: not-allowed; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      width: 100%;
+      padding: 9px 14px;
+      border: 1px solid transparent;
+      border-radius: 9px;
+      background: var(--card-2);
+      color: var(--ink);
+      font: inherit;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.15); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn.primary { background: var(--accent); color: #06231a; }
+    .btn.accent { background: var(--blue); color: #05203c; }
+    .btn.subtle { background: var(--card-2); border-color: var(--line); }
+    .btn.quiet { background: transparent; border-color: var(--line); color: var(--muted); font-weight: 500; }
+    .btn.danger { background: transparent; border-color: rgba(227, 93, 106, .45); color: var(--danger); }
+    .btn.rec { background: rgba(227, 93, 106, .16); color: #ff9aa4; }
+    .btn.rec.on { background: var(--danger); color: #2b0a0e; }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row > * { flex: 1; min-width: 0; }
+    .btn-row.tight > * { flex: 0 0 auto; }
+
+    /* ---------- chips ---------- */
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--card-2);
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .chip.live { background: rgba(43, 182, 115, .16); color: #6ee7a8; }
+    .chip.blue { background: rgba(74, 144, 226, .16); color: #9ac4f5; }
+    .chip.bad { background: rgba(227, 93, 106, .16); color: #f19aa2; }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    /* ---------- status lines ---------- */
+
+    .status { margin: 0; font-size: .82rem; color: var(--muted); min-height: 1.1em; }
+    .status.error { color: #f19aa2; }
+    .status.ok { color: #6ee7a8; }
+
+    /* ---------- lead panel ---------- */
+
+    .lead-detail {
+      background: #0c131c;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 10px 12px;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    .lead-detail .name { color: var(--ink); font-weight: 600; display: block; margin-bottom: 6px; }
+
+    /* ---------- call panel ---------- */
+
+    .callbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .callbar .btn { width: auto; padding: 6px 12px; font-size: .8rem; }
+
+    .captured {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .captured .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .captured .chip b { color: var(--muted); font-weight: 600; }
+    .captured .chip.live b { color: #6ee7a8; }
+
+    .messages {
+      height: 340px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: #33465c transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      background: #0c131c;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+    .messages::-webkit-scrollbar { width: 8px; }
+    .messages::-webkit-scrollbar-track { background: transparent; }
+    .messages::-webkit-scrollbar-thumb { background: #33465c; border-radius: 999px; }
+    .messages .empty {
+      margin: auto;
+      color: var(--muted);
+      font-size: .85rem;
+      text-align: center;
+      max-width: 320px;
+    }
+    .bubble {
+      padding: 9px 12px;
+      border-radius: 12px;
+      max-width: 78%;
+      white-space: pre-wrap;
+      font-size: .9rem;
+    }
+    .bubble.ai { align-self: flex-start; background: var(--card-2); border-bottom-left-radius: 3px; }
+    .bubble.customer { align-self: flex-end; background: #1c3f34; border-bottom-right-radius: 3px; }
+    .bubble .meta {
+      font-size: .68rem;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+    .bubble a { color: var(--muted); font-size: .72rem; }
+
+    .composer { margin-top: 14px; }
+    .composer .or {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: .75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .composer .or::before, .composer .or::after {
+      content: "";
+      flex: 1;
+      border-top: 1px solid var(--line);
+    }
+    #sendTextBtn { flex: 0 0 150px; }
+
+    /* ---------- dashboard ---------- */
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .metric {
+      background: #0c131c;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 13px;
+      text-align: left;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+    }
+    .metric:hover { border-color: #33465c; }
+    .metric.on { border-color: var(--blue); background: rgba(74, 144, 226, .1); }
+    .metric .n { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+    .metric .k {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .metric.qualified .n { color: #9ac4f5; }
+    .metric.converted .n { color: #6ee7a8; }
+    .metric.disqualified .n { color: #f19aa2; }
+
+    /* ---------- leads table ---------- */
+
+    .table-wrap {
+      max-height: 292px;
+      overflow-y: auto;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: #33465c transparent;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: var(--card-2);
+      text-align: left;
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--muted);
+      font-weight: 600;
+      padding: 9px 12px;
+      white-space: nowrap;
+    }
+    tbody td { padding: 9px 12px; border-top: 1px solid var(--line); }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover { background: rgba(255, 255, 255, .03); }
+    tbody tr.on { background: rgba(74, 144, 226, .12); }
+    tbody td.right { text-align: right; white-space: nowrap; }
+    tbody .muted { color: var(--muted); }
+    tbody .empty-row { text-align: center; color: var(--muted); padding: 22px; }
+    .table-wrap .btn { width: auto; padding: 4px 10px; font-size: .76rem; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      background: var(--card-2);
+      color: var(--muted);
+    }
+    .badge.CONTACTED { background: rgba(74, 144, 226, .16); color: #9ac4f5; }
+    .badge.QUALIFIED { background: rgba(74, 144, 226, .28); color: #bcd9fb; }
+    .badge.CONVERTED { background: rgba(43, 182, 115, .18); color: #6ee7a8; }
+    .badge.DISQUALIFIED { background: rgba(227, 93, 106, .16); color: #f19aa2; }
+
+    /* ---------- summary ---------- */
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat {
+      background: #0c131c;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 9px 12px;
+    }
+    .stat .k { font-size: .7rem; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+    .stat .v { font-size: .95rem; font-weight: 600; margin-top: 2px; }
+    .stat.wide { grid-column: 1 / -1; }
+    .summary-text {
+      background: #0c131c;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 12px;
+      font-size: .88rem;
+      color: var(--ink);
+    }
+    .placeholder { color: var(--muted); font-size: .85rem; }
+  </style>
+</head>
+<body>
+<main>
+  <header class="topbar">
+    <div>
+      <h1>AI Calling Agent</h1>
+      <p class="sub">Simulated sales qualification call — the agent speaks, you answer with your voice.</p>
+    </div>
+  </header>
+
+  <div class="warning" id="speechWarning" hidden></div>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>Pipeline</h2>
+    <div class="metrics" id="metrics"></div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Name</th>
+            <th>Company</th>
+            <th>Phone</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="leadRows"></tbody>
+      </table>
+    </div>
+    <p class="status" id="tableStatus"></p>
+  </section>
+
+  <div class="layout">
+    <aside class="card">
+      <h2>Lead</h2>
+      <div class="stack">
+        <div>
+          <label for="name">Name</label>
+          <input id="name" value="Priya Sharma" />
+        </div>
+        <div>
+          <label for="phone">Phone number</label>
+          <input id="phone" value="+919876543210" />
+        </div>
+        <div>
+          <label for="company">Company</label>
+          <input id="company" value="Northwind Sales" />
+        </div>
+        <button class="btn primary" id="createLeadBtn">Create lead</button>
+      </div>
+
+      <hr class="sep" />
+
+      <div class="stack">
+        <div>
+          <label for="leadSelect">Selected lead</label>
+          <select id="leadSelect"></select>
+        </div>
+        <div class="lead-detail" id="leadDetail">No lead selected.</div>
+        <div>
+          <label for="statusSelect">Lead status</label>
+          <div class="btn-row">
+            <select id="statusSelect">
+              <option value="NEW">NEW</option>
+              <option value="CONTACTED">CONTACTED</option>
+              <option value="QUALIFIED">QUALIFIED</option>
+              <option value="DISQUALIFIED">DISQUALIFIED</option>
+              <option value="CONVERTED">CONVERTED</option>
+            </select>
+            <button class="btn subtle" id="updateLeadBtn" style="flex:0 0 84px">Save</button>
+          </div>
+        </div>
+        <button class="btn accent" id="startCallBtn">Start AI call</button>
+        <button class="btn danger" id="deleteLeadBtn">Delete lead</button>
+        <p class="status" id="leadStatus"></p>
+      </div>
+    </aside>
+
+    <section class="card">
+      <div class="callbar">
+        <div class="chips">
+          <span class="chip" id="callPill">no active call</span>
+          <span class="chip blue" id="stepPill">—</span>
+          <span class="chip" id="outcomePill">—</span>
+        </div>
+        <div class="btn-row tight">
+          <button class="btn quiet" id="loadHistoryBtn" disabled>Reload history</button>
+          <button class="btn quiet" id="refreshSummaryBtn" disabled>Load summary</button>
+        </div>
+      </div>
+
+      <div class="captured" id="captured"></div>
+
+      <div class="messages" id="messages">
+        <div class="empty">Create or pick a lead, then press <strong>Start AI call</strong>. The agent's greeting will play here.</div>
+      </div>
+
+      <div class="composer stack">
+        <div class="btn-row">
+          <button class="btn rec" id="recordBtn" disabled>Record mic</button>
+          <button class="btn subtle" id="stopBtn" disabled>Stop</button>
+          <button class="btn subtle" id="uploadBtn" disabled>Upload audio</button>
+          <input type="file" id="audioFile" accept="audio/*" hidden />
+        </div>
+        <button class="btn primary" id="sendBtn" disabled>Send recorded reply</button>
+        <p class="status" id="recordingInfo"></p>
+        <div class="or">or type the reply — no microphone needed</div>
+        <div class="btn-row">
+          <input id="textReply" placeholder="Yes, I am interested in a CRM" disabled />
+          <button class="btn accent" id="sendTextBtn" disabled>Send typed reply</button>
+        </div>
+        <p class="status" id="callStatus"></p>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Call summary and outcome</h2>
+    <div id="summaryBox"><p class="placeholder">The summary appears when a call ends, or press “Load summary”.</p></div>
+  </section>
+</main>
+
+<script>
+  const el = id => document.getElementById(id);
+  const player = new Audio();
+  const leadStatus = el('leadStatus');
+  const callStatus = el('callStatus');
+  const recordingInfo = el('recordingInfo');
+
+  const LEAD_STAGES = ['NEW', 'CONTACTED', 'QUALIFIED', 'CONVERTED', 'DISQUALIFIED'];
+
+  let activeCallId = null;
+  let callOpen = false;
+  let mediaStream = null;
+  let captureContext = null;
+  let captureProcessor = null;
+  let pcmChunks = [];
+  let captureSampleRate = 48000;
+  let meterTimer = null;
+  let pendingAudioFile = null;
+  let leads = [];
+  let statusFilter = null;
+
+  // Voice detection works on ratios, not absolute loudness, because microphone gain varies wildly.
+  // Speech stands well above the room's noise floor and lasts; a click is loud but over in 60 ms.
+  const FRAME_MS = 30;
+  const TARGET_RMS = 0.12;   // level the recording is lifted to before anything is judged
+  const VOICE_RATIO = 2.5;   // how far above the noise floor a frame must sit to be speech
+  const MIN_VOICE_RMS = 0.01;
+  const MIN_SPEECH_MS = 200; // total voiced time, so a stray click cannot qualify
+  const LOUD_ROOM_RMS = 0.02; // sustained level that is plainly someone talking, pauses or not
+  const QUIET_RMS = 0.05;
+  const TRIM_PAD_MS = 300; // context kept on each side of the voiced span when trimming dead air
+
+  /* ---------- small helpers ---------- */
+
+  async function api(url, options) {
+    const response = await fetch(url, options);
+    const text = await response.text();
+    const body = text ? JSON.parse(text) : null;
+    if (!response.ok) {
+      const error = new Error(body && body.message ? body.message : `Request failed (HTTP ${response.status})`);
+      error.code = body && body.error;
+      throw error;
+    }
+    return body;
+  }
+
+  function setStatus(node, message, kind) {
+    node.textContent = message || '';
+    node.className = 'status' + (kind ? ' ' + kind : '');
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function clearMessages(emptyText) {
+    el('messages').innerHTML = emptyText
+      ? `<div class="empty">${escapeHtml(emptyText)}</div>`
+      : '';
+  }
+
+  function addBubble(speaker, text, note) {
+    const messages = el('messages');
+    const empty = messages.querySelector('.empty');
+    if (empty) empty.remove();
+
+    const label = (speaker === 'AI' ? 'AI agent' : 'customer') + (note ? ' · ' + note : '');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble ' + (speaker === 'AI' ? 'ai' : 'customer');
+    bubble.innerHTML = `<div class="meta">${escapeHtml(label)}</div>` + escapeHtml(text);
+    messages.appendChild(bubble);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  /* ---------- call state ---------- */
+
+  function setComposerEnabled(enabled) {
+    callOpen = enabled;
+    el('recordBtn').disabled = !enabled;
+    el('uploadBtn').disabled = !enabled;
+    el('sendBtn').disabled = !enabled;
+    el('textReply').disabled = !enabled;
+    el('sendTextBtn').disabled = !enabled;
+  }
+
+  function setCallMeta(data) {
+    activeCallId = data.callId;
+    el('callPill').textContent = 'call #' + data.callId;
+    el('stepPill').textContent = data.currentStep.toLowerCase().replace(/_/g, ' ');
+    el('outcomePill').textContent = data.outcome.toLowerCase().replace(/_/g, ' ');
+    el('outcomePill').className = 'chip' + (data.conversationCompleted ? ' live' : '');
+    el('refreshSummaryBtn').disabled = false;
+    el('loadHistoryBtn').disabled = false;
+    setComposerEnabled(!data.conversationCompleted);
+  }
+
+  /** Shows the qualification answers filling up while the call is still running. */
+  function renderCaptured(captured) {
+    const c = captured || {};
+    const yesNo = value => value == null ? null : (value ? 'yes' : 'no');
+    const fields = [
+      ['interested', yesNo(c.interestedInCrm)],
+      ['team size', c.salesTeamSize],
+      ['leads today', c.leadManagementMethod],
+      ['demo', yesNo(c.wantsDemo)]
+    ];
+    el('captured').innerHTML = fields.map(([label, value]) => {
+      const known = value !== null && value !== undefined && value !== '';
+      const text = known ? String(value) : 'not answered yet';
+      const short = text.length > 44 ? text.slice(0, 44) + '…' : text;
+      return `<span class="chip${known ? ' live' : ''}" title="${escapeHtml(text)}">`
+        + `<b>${label}</b> ${escapeHtml(short)}</span>`;
+    }).join('');
+  }
+
+  function setPendingAudio(file) {
+    pendingAudioFile = file;
+  }
+
+  function resetCallPanel() {
+    activeCallId = null;
+    setPendingAudio(null);
+    renderCaptured(null);
+    el('callPill').textContent = 'no active call';
+    el('stepPill').textContent = '—';
+    el('outcomePill').textContent = '—';
+    el('outcomePill').className = 'chip';
+    setComposerEnabled(false);
+    el('refreshSummaryBtn').disabled = true;
+    el('loadHistoryBtn').disabled = true;
+    el('audioFile').value = '';
+    player.pause();
+    clearMessages('Create or pick a lead, then press Start AI call.');
+    el('summaryBox').innerHTML = '<p class="placeholder">The summary appears when a call ends, or press “Load summary”.</p>';
+    setStatus(recordingInfo, '');
+    setStatus(callStatus, '');
+  }
+
+  /** Speaks the agent's turn as soon as it arrives — there is no player to press. */
+  function playAgentVoice(audioUrl) {
+    if (!audioUrl) return;
+    player.src = audioUrl;
+    player.play().catch(() => setStatus(recordingInfo,
+      'The browser blocked the agent voice. Click anywhere on the page, then send the next reply.', 'error'));
+  }
+
+  /* ---------- speech configuration ---------- */
+
+  /** Stays silent while speech works, and only speaks up when a call would fail. */
+  async function checkSpeechConfig() {
+    const warning = el('speechWarning');
+    try {
+      const speech = await api('/api/speech/status');
+      if (speech.apiKeyConfigured) return;
+      warning.textContent = 'Speech is not configured: ' + speech.note;
+    } catch (e) {
+      warning.textContent = 'Speech status unavailable: ' + e.message;
+    }
+    warning.hidden = false;
+  }
+
+  /* ---------- dashboard ---------- */
+
+  function metric(key, value, filter, className) {
+    const on = statusFilter === filter ? ' on' : '';
+    return `<button class="metric${className ? ' ' + className : ''}${on}" data-filter="${filter || ''}">`
+      + `<div class="n">${value}</div><div class="k">${escapeHtml(key)}</div></button>`;
+  }
+
+  function renderDashboard(board) {
+    const byStatus = board.leadsByStatus;
+    el('metrics').innerHTML =
+      metric('All leads', board.totalLeads, '') +
+      LEAD_STAGES.map(status =>
+        metric(status.toLowerCase(), byStatus[status] || 0, status, status.toLowerCase())).join('') +
+      metric('calls done', board.completedCalls + ' / ' + board.totalCalls, '');
+
+    el('metrics').querySelectorAll('.metric').forEach(button => {
+      button.onclick = () => {
+        const next = button.dataset.filter;
+        statusFilter = !next || next === statusFilter ? null : next;
+        renderDashboard(board);
+        renderLeadRows();
+      };
+    });
+  }
+
+  async function refreshDashboard() {
+    try {
+      renderDashboard(await api('/api/dashboard'));
+    } catch (e) {
+      el('metrics').innerHTML = `<p class="placeholder">Could not load the pipeline: ${escapeHtml(e.message)}</p>`;
+    }
+  }
+
+  /* ---------- leads ---------- */
+
+  function renderLeadRows() {
+    const selected = el('leadSelect').value;
+    const rows = statusFilter ? leads.filter(lead => lead.status === statusFilter) : leads;
+    el('leadRows').innerHTML = rows.length === 0
+      ? `<tr><td class="empty-row" colspan="7">${statusFilter
+          ? 'No leads with status ' + statusFilter.toLowerCase() + '.'
+          : 'No leads yet — create one below.'}</td></tr>`
+      : rows.map(lead => `
+        <tr data-id="${lead.id}" class="${String(lead.id) === String(selected) ? 'on' : ''}">
+          <td class="muted">${lead.id}</td>
+          <td>${escapeHtml(lead.name)}</td>
+          <td class="muted">${escapeHtml(lead.companyName || '—')}</td>
+          <td class="muted">${escapeHtml(lead.phoneNumber)}</td>
+          <td><span class="badge ${lead.status}">${lead.status.toLowerCase()}</span></td>
+          <td class="muted">${new Date(lead.createdAt).toLocaleDateString()}</td>
+          <td class="right"><button class="btn subtle" data-call="${lead.id}">Call</button></td>
+        </tr>`).join('');
+
+    setStatus(el('tableStatus'), statusFilter
+      ? `Showing ${rows.length} of ${leads.length} leads · filtered by ${statusFilter.toLowerCase()}`
+      : `${leads.length} lead${leads.length === 1 ? '' : 's'}`);
+
+    el('leadRows').querySelectorAll('tr[data-id]').forEach(row => {
+      row.onclick = () => selectLead(row.dataset.id);
+    });
+    el('leadRows').querySelectorAll('button[data-call]').forEach(button => {
+      button.onclick = async event => {
+        event.stopPropagation();
+        await selectLead(button.dataset.call);
+        await startCall();
+      };
+    });
+  }
+
+  function selectLead(leadId) {
+    if (el('leadSelect').value === String(leadId)) return Promise.resolve();
+    el('leadSelect').value = leadId;
+    return openSelectedLead();
+  }
+
+  async function refreshLeads(selectId) {
+    try {
+      const select = el('leadSelect');
+      const previous = selectId || select.value;
+      const [fetched] = await Promise.all([api('/api/leads'), refreshDashboard()]);
+      leads = fetched;
+
+      select.innerHTML = leads
+        .map(lead => `<option value="${lead.id}">#${lead.id} ${escapeHtml(lead.name)}`
+          + ` — ${escapeHtml(lead.companyName || 'no company')}</option>`)
+        .join('');
+      if (previous && leads.some(lead => String(lead.id) === String(previous))) {
+        select.value = previous;
+      }
+
+      const none = leads.length === 0;
+      el('startCallBtn').disabled = none;
+      el('deleteLeadBtn').disabled = none;
+      el('updateLeadBtn').disabled = none;
+      renderLeadRows();
+      await showLeadDetail();
+    } catch (e) {
+      setStatus(leadStatus, 'Could not load leads: ' + e.message, 'error');
+    }
+  }
+
+  async function showLeadDetail() {
+    const leadId = el('leadSelect').value;
+    const detail = el('leadDetail');
+    if (!leadId) {
+      detail.innerHTML = '<span class="placeholder">No leads yet. Create one above to start.</span>';
+      return null;
+    }
+    try {
+      const lead = await api('/api/leads/' + leadId);
+      el('statusSelect').value = lead.status;
+      const last = lead.calls[0];
+      detail.innerHTML =
+        `<span class="name">${escapeHtml(lead.name)}</span>` +
+        `<div class="chips">` +
+        `<span class="chip">${escapeHtml(lead.status.toLowerCase())}</span>` +
+        `<span class="chip">${lead.totalCalls} call${lead.totalCalls === 1 ? '' : 's'}</span>` +
+        (last ? `<span class="chip blue">last: ${escapeHtml(last.outcome.toLowerCase().replace(/_/g, ' '))}</span>` : '') +
+        `</div>`;
+      return lead;
+    } catch (e) {
+      detail.innerHTML = `<span class="placeholder">Could not load this lead: ${escapeHtml(e.message)}</span>`;
+      return null;
+    }
+  }
+
+  /**
+   * Reopens the lead's most recent call in the conversation panel: the stored turns, what has been
+   * captured so far, and the step it stopped at. An unfinished call can simply be continued.
+   */
+  async function openLatestCall(lead) {
+    resetCallPanel();
+    const last = lead && lead.calls && lead.calls[0];
+    if (!last) {
+      setStatus(callStatus, lead
+        ? 'No calls yet for ' + lead.name + ' — press Start AI call.'
+        : '');
+      return;
+    }
+
+    setCallMeta({
+      callId: last.callId,
+      currentStep: last.currentStep,
+      outcome: last.outcome,
+      conversationCompleted: last.status === 'COMPLETED'
+    });
+
+    try {
+      const history = await api('/api/calls/' + last.callId + '/conversation');
+      clearMessages();
+      history.messages.forEach(message => addBubble(message.speakerType, message.messageText));
+      await loadSummary();
+      setStatus(callStatus, last.status === 'COMPLETED'
+        ? 'This call is finished. Press Start AI call to talk to this lead again.'
+        : 'Call in progress — answer the last question above.');
+    } catch (e) {
+      setStatus(callStatus, e.message, 'error');
+    }
+  }
+
+  async function openSelectedLead() {
+    renderLeadRows();
+    await openLatestCall(await showLeadDetail());
+  }
+
+  el('leadSelect').onchange = openSelectedLead;
+
+  el('createLeadBtn').onclick = async () => {
+    try {
+      const lead = await api('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: el('name').value,
+          phoneNumber: el('phone').value,
+          companyName: el('company').value
+        })
+      });
+      setStatus(leadStatus, `Created lead #${lead.id}`, 'ok');
+      await refreshLeads(lead.id);
+      await openSelectedLead();
+    } catch (e) {
+      setStatus(leadStatus, e.message, 'error');
+    }
+  };
+
+  el('updateLeadBtn').onclick = async () => {
+    const leadId = el('leadSelect').value;
+    if (!leadId) return;
+    try {
+      await api('/api/leads/' + leadId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: el('statusSelect').value })
+      });
+      setStatus(leadStatus, `Lead #${leadId} updated`, 'ok');
+      await refreshLeads(leadId);
+    } catch (e) {
+      setStatus(leadStatus, e.message, 'error');
+    }
+  };
+
+  el('deleteLeadBtn').onclick = async () => {
+    const leadId = el('leadSelect').value;
+    if (!leadId) return;
+    if (!confirm(`Delete lead #${leadId} with all of its calls and conversation history?`)) return;
+    try {
+      await api('/api/leads/' + leadId, { method: 'DELETE' });
+      setStatus(leadStatus, `Lead #${leadId} deleted`, 'ok');
+      resetCallPanel();
+      await refreshLeads();
+    } catch (e) {
+      setStatus(leadStatus, e.message, 'error');
+    }
+  };
+
+  /* ---------- starting a call ---------- */
+
+  async function startCall() {
+    try {
+      const leadId = el('leadSelect').value;
+      if (!leadId) throw new Error('Create or select a lead first');
+      resetCallPanel();
+      clearMessages();
+      setStatus(callStatus, 'Generating the greeting with OpenAI…');
+
+      const data = await api('/api/calls/start/' + leadId, { method: 'POST' });
+      setCallMeta(data);
+      addBubble('AI', data.aiMessage);
+      playAgentVoice(data.audioUrl);
+      setStatus(callStatus, 'Call started. Record your answer, upload an audio file, or type the reply.');
+      await refreshLeads(leadId);
+    } catch (e) {
+      setStatus(callStatus, e.message, 'error');
+    }
+  }
+
+  el('startCallBtn').onclick = startCall;
+
+  /* ---------- recording and upload ---------- */
+
+  el('recordBtn').onclick = async () => {
+    try {
+      pcmChunks = [];
+      setPendingAudio(null);
+      mediaStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
+        }
+      });
+      await startPcmCapture(mediaStream);
+
+      el('recordBtn').disabled = true;
+      el('recordBtn').classList.add('on');
+      el('recordBtn').textContent = 'Recording…';
+      el('stopBtn').disabled = false;
+    } catch (e) {
+      setStatus(recordingInfo, 'Microphone unavailable: ' + e.message, 'error');
+      stopRecordingUi();
+    }
+  };
+
+  /**
+   * Captures PCM straight from the mic graph. MediaRecorder → webm → decode was dropping usable
+   * speech on some setups and left only clicks, which then failed every transcription attempt.
+   */
+  async function startPcmCapture(stream) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    captureContext = new AudioCtx();
+    if (captureContext.state === 'suspended') {
+      await captureContext.resume();
+    }
+    captureSampleRate = captureContext.sampleRate;
+    const source = captureContext.createMediaStreamSource(stream);
+    // ScriptProcessor is deprecated but still the portable way to get raw samples without a worklet file.
+    captureProcessor = captureContext.createScriptProcessor(4096, 1, 1);
+    const silent = captureContext.createGain();
+    silent.gain.value = 0;
+    source.connect(captureProcessor);
+    captureProcessor.connect(silent);
+    silent.connect(captureContext.destination);
+
+    let heardVoice = false;
+    let loudest = 0.02;
+    const recent = [];
+
+    captureProcessor.onaudioprocess = event => {
+      const input = event.inputBuffer.getChannelData(0);
+      pcmChunks.push(new Float32Array(input));
+      let sum = 0;
+      for (let i = 0; i < input.length; i++) sum += input[i] * input[i];
+      const level = Math.sqrt(sum / input.length);
+
+      // Auto-scaled against this microphone's own floor, so a quiet input still shows movement.
+      recent.push(level);
+      if (recent.length > 40) recent.shift();
+      const floor = Math.min(...recent);
+      loudest = Math.max(loudest * 0.99, level);
+      if (level > Math.max(0.002, floor * 4)) heardVoice = true;
+
+      setStatus(recordingInfo,
+        `Recording ${meterBar(level / loudest)} ${heardVoice
+          ? 'Speak your reply, then press Stop.'
+          : 'Bar empty? Check the browser is using the right microphone — this input is not hearing you.'}`,
+        heardVoice ? '' : 'error');
+    };
+  }
+
+  function stopPcmCapture() {
+    clearInterval(meterTimer);
+    meterTimer = null;
+    if (captureProcessor) {
+      captureProcessor.onaudioprocess = null;
+      try { captureProcessor.disconnect(); } catch (_) {}
+      captureProcessor = null;
+    }
+    if (captureContext) {
+      captureContext.close();
+      captureContext = null;
+    }
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+  }
+
+  /** Takes a 0-1 share of the loudest sound heard so far, not an absolute level. */
+  function meterBar(share) {
+    const filled = Math.max(0, Math.min(10, Math.round(share * 10)));
+    return '▮'.repeat(filled) + '▯'.repeat(10 - filled);
+  }
+
+  function percent(level) {
+    return Math.round(Math.min(1, level / TARGET_RMS) * 100) + '%';
+  }
+
+  function mergePcm(chunks) {
+    let total = 0;
+    for (const chunk of chunks) total += chunk.length;
+    const samples = new Float32Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      samples.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return samples;
+  }
+
+  function frameLevels(samples, sampleRate) {
+    const frame = Math.max(1, Math.round(sampleRate * FRAME_MS / 1000));
+    const levels = [];
+    for (let i = 0; i + frame <= samples.length; i += frame) {
+      let sum = 0;
+      for (let j = i; j < i + frame; j++) sum += samples[j] * samples[j];
+      levels.push(Math.sqrt(sum / frame));
+    }
+    return levels;
+  }
+
+  function percentile(sorted, fraction) {
+    if (!sorted.length) return 0;
+    return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))];
+  }
+
+  /**
+   * Lifts a quiet microphone to a usable level. The gain comes from the 95th percentile of frame
+   * levels rather than the peak, so one mouse click cannot decide the gain for the whole take.
+   */
+  function normalizeGain(samples, sampleRate) {
+    const sorted = [...frameLevels(samples, sampleRate)].sort((a, b) => a - b);
+    const loud = percentile(sorted, 0.95);
+    if (loud < 0.00001) return samples;
+    const gain = Math.max(1, Math.min(20, TARGET_RMS / loud));
+    if (gain <= 1.05) return samples;
+    const boosted = new Float32Array(samples.length);
+    for (let i = 0; i < samples.length; i++) {
+      boosted[i] = Math.max(-1, Math.min(1, samples[i] * gain));
+    }
+    return boosted;
+  }
+
+  function downsample(samples, fromRate, toRate) {
+    if (fromRate === toRate) return samples;
+    const ratio = fromRate / toRate;
+    const length = Math.max(1, Math.floor(samples.length / ratio));
+    const out = new Float32Array(length);
+    for (let i = 0; i < length; i++) {
+      const start = Math.floor(i * ratio);
+      const end = Math.min(samples.length, Math.floor((i + 1) * ratio));
+      let sum = 0;
+      for (let j = start; j < end; j++) sum += samples[j];
+      out[i] = sum / Math.max(1, end - start);
+    }
+    return out;
+  }
+
+  /**
+   * Speech is the part of the recording that rises clearly above the room and stays there. Judging
+   * it against the take's own noise floor keeps the test independent of microphone gain, and
+   * counting total voiced time keeps a single click — loud, but 60 ms long — from passing as an answer.
+   */
+  function measureSpeech(samples, sampleRate) {
+    const levels = frameLevels(samples, sampleRate);
+    const seconds = samples.length / sampleRate;
+    if (!levels.length) return { speechMs: 0, level: 0, floor: 0, seconds };
+
+    const sorted = [...levels].sort((a, b) => a - b);
+    const floor = percentile(sorted, 0.2);
+    const threshold = Math.max(MIN_VOICE_RMS, floor * VOICE_RATIO);
+
+    let voiced = 0;
+    let sum = 0;
+    for (const level of levels) {
+      if (level > threshold) {
+        voiced++;
+        sum += level;
+      }
+    }
+    return {
+      speechMs: voiced * FRAME_MS,
+      level: voiced ? sum / voiced : 0,
+      floor,
+      seconds
+    };
+  }
+
+  /**
+   * Cuts the dead air before and after whatever was said, keeping a little context on each side.
+   * A press-record-then-think-then-speak habit can leave several silent seconds in an otherwise
+   * short answer; sending that whole span gives a model no more words to work with, just more
+   * silence to reason about, and gpt-audio-mini's chat-completions path is the one path here where
+   * that reliably tips it into answering about the recording instead of transcribing it.
+   */
+  function trimSilence(samples, sampleRate, floor) {
+    const frame = Math.max(1, Math.round(sampleRate * FRAME_MS / 1000));
+    const threshold = Math.max(MIN_VOICE_RMS, floor * VOICE_RATIO);
+    const padFrames = Math.round(TRIM_PAD_MS / FRAME_MS);
+    let firstVoiced = -1;
+    let lastVoiced = -1;
+    for (let i = 0, frameIndex = 0; i + frame <= samples.length; i += frame, frameIndex++) {
+      let sum = 0;
+      for (let j = i; j < i + frame; j++) sum += samples[j] * samples[j];
+      if (Math.sqrt(sum / frame) > threshold) {
+        if (firstVoiced < 0) firstVoiced = frameIndex;
+        lastVoiced = frameIndex;
+      }
+    }
+    if (firstVoiced < 0) return samples;
+    const start = Math.max(0, (firstVoiced - padFrames) * frame);
+    const end = Math.min(samples.length, (lastVoiced + padFrames + 1) * frame);
+    return samples.slice(start, end);
+  }
+
+  /**
+   * Prepares a take and decides whether it holds a voice. Two ways to qualify, because they fail on
+   * opposite recordings: the ratio test needs quiet between words, and someone who talks without
+   * pausing leaves none — for them, sheer sustained loudness settles it.
+   */
+  function analyseTake(samples, sampleRate) {
+    const raw = [...frameLevels(samples, sampleRate)].sort((a, b) => a - b);
+    const rawMedian = percentile(raw, 0.5);
+    const targetRate = 16000;
+    const full = downsample(normalizeGain(samples, sampleRate), sampleRate, targetRate);
+    const speech = measureSpeech(full, targetRate);
+    const hasVoice = speech.speechMs >= MIN_SPEECH_MS || rawMedian >= LOUD_ROOM_RMS;
+    const pcm = hasVoice ? trimSilence(full, targetRate, speech.floor) : full;
+    return { pcm, targetRate, speech, rawMedian, hasVoice };
+  }
+
+  function finishRecording(samples, sampleRate, label) {
+    const take = analyseTake(samples, sampleRate);
+    const speech = take.speech;
+    // Always keep the file: the check is advice, and a demo must never be blocked by a guess.
+    setPendingAudio(new File([encodeWav(take.pcm, take.targetRate)], 'recording.wav',
+      { type: 'audio/wav' }));
+
+    if (!take.hasVoice) {
+      setStatus(recordingInfo,
+        `${label}: ${speech.seconds.toFixed(1)}s, but no speech stood out from the background. `
+          + 'Check the browser is using the right microphone, watch the bar move while you talk, and record again. '
+          + 'You can still press Send, or type the reply.',
+        'error');
+      return;
+    }
+    if (speech.level < QUIET_RMS) {
+      setStatus(recordingInfo,
+        `${label} ready: ${speech.seconds.toFixed(1)}s, ${(speech.speechMs / 1000).toFixed(1)}s of quiet `
+          + 'speech. Press Send recorded reply, or move closer and record again.');
+      return;
+    }
+    setStatus(recordingInfo,
+      `${label} ready: ${speech.seconds.toFixed(1)}s, ${(speech.speechMs / 1000).toFixed(1)}s of speech, `
+        + `voice ${percent(speech.level)}. Press Send recorded reply.`,
+      'ok');
+  }
+
+  function stopRecordingUi() {
+    const record = el('recordBtn');
+    record.disabled = !callOpen;
+    record.classList.remove('on');
+    record.textContent = 'Record mic';
+    el('stopBtn').disabled = true;
+  }
+
+  el('stopBtn').onclick = () => {
+    const rate = captureSampleRate;
+    const chunks = pcmChunks;
+    pcmChunks = [];
+    stopPcmCapture();
+    stopRecordingUi();
+    if (!chunks.length) {
+      setStatus(recordingInfo, 'Nothing was captured. Check the microphone permission and try again.', 'error');
+      return;
+    }
+    finishRecording(mergePcm(chunks), rate, 'Recording');
+  };
+
+  el('uploadBtn').onclick = () => el('audioFile').click();
+
+  el('audioFile').onchange = async () => {
+    const file = el('audioFile').files[0];
+    if (!file) return;
+    setStatus(recordingInfo, 'Preparing uploaded file…');
+    try {
+      const wav = await decodeToPcm(file);
+      finishRecording(wav.samples, wav.sampleRate, file.name);
+    } catch (err) {
+      setPendingAudio(file);
+      setStatus(recordingInfo, `${file.name} will be sent as-is (${file.type || 'unknown type'}).`);
+    }
+  };
+
+  async function decodeToPcm(blob) {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    try {
+      const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+      const samples = decoded.getChannelData(0);
+      return { samples: new Float32Array(samples), sampleRate: decoded.sampleRate };
+    } finally {
+      ctx.close();
+    }
+  }
+
+  function encodeWav(samples, sampleRate) {
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+    const writeStr = (offset, str) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++, offset += 2) {
+      const clamped = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+    }
+    return buffer;
+  }
+
+  /* ---------- sending a reply ---------- */
+
+  /** Runs one customer turn, whatever the input mode, and paints the result. */
+  async function sendTurn(pending, send) {
+    if (!activeCallId) {
+      setStatus(callStatus, 'Start a call first', 'error');
+      return;
+    }
+    setComposerEnabled(false);
+    setStatus(callStatus, pending);
+    try {
+      const data = await send();
+      addBubble('CUSTOMER', data.customerTranscript,
+        data.inputMode === 'TEXT' ? 'typed' : 'transcribed by OpenAI');
+      addBubble('AI', data.aiMessage);
+      setCallMeta(data);
+      renderCaptured(data.captured);
+      playAgentVoice(data.audioUrl);
+
+      setPendingAudio(null);
+      el('audioFile').value = '';
+      el('textReply').value = '';
+      setStatus(recordingInfo, '');
+
+      if (data.conversationCompleted) {
+        setStatus(callStatus, 'Conversation completed.', 'ok');
+        await loadSummary();
+        await refreshLeads();
+      } else {
+        setStatus(callStatus, 'Your turn — answer the question above.');
+      }
+    } catch (e) {
+      setStatus(callStatus, e.message, 'error');
+      setComposerEnabled(true);
+    }
+  }
+
+  el('sendBtn').onclick = () => {
+    if (!pendingAudioFile) {
+      setStatus(callStatus, 'Record a reply or upload an audio file first.', 'error');
+      return;
+    }
+    const form = new FormData();
+    form.append('audio', pendingAudioFile);
+    return sendTurn('Transcribing your reply and generating the next question…', async () => {
+      try {
+        return await api('/api/calls/' + activeCallId + '/response', { method: 'POST', body: form });
+      } catch (e) {
+        // A recording that cannot be read leaves the call waiting on the same question, so put the
+        // cursor where the answer can still be given rather than making the operator find it.
+        el('textReply').focus();
+        throw e;
+      }
+    });
+  };
+
+  function postTypedReply(text, speak) {
+    return api('/api/calls/' + activeCallId + '/response/text?speak=' + speak, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+  }
+
+  el('sendTextBtn').onclick = () => {
+    const text = el('textReply').value.trim();
+    if (!text) {
+      setStatus(callStatus, 'Type the customer reply first.', 'error');
+      return;
+    }
+    return sendTurn('Generating the next question…', async () => {
+      try {
+        return await postTypedReply(text, true);
+      } catch (e) {
+        if (e.code !== 'SPEECH_QUOTA_EXCEEDED') throw e;
+        // The free tier is rate limited: keep the conversation going with text only.
+        setStatus(callStatus, 'OpenAI is rate limited — continuing without the agent voice…');
+        return postTypedReply(text, false);
+      }
+    });
+  };
+
+  el('textReply').onkeydown = event => {
+    if (event.key === 'Enter') el('sendTextBtn').click();
+  };
+
+  /* ---------- summary and history ---------- */
+
+  function stat(key, value, wide) {
+    const shown = value === null || value === undefined || value === '' ? '—' : value;
+    return `<div class="stat${wide ? ' wide' : ''}"><div class="k">${escapeHtml(key)}</div>`
+      + `<div class="v">${escapeHtml(String(shown))}</div></div>`;
+  }
+
+  async function loadSummary() {
+    if (!activeCallId) return;
+    const summary = await api('/api/calls/' + activeCallId + '/summary');
+    renderCaptured(summary);
+    el('summaryBox').innerHTML =
+      `<div class="summary-grid">` +
+      stat('Status', summary.status) +
+      stat('Outcome', summary.outcome) +
+      stat('Interested in CRM', summary.interestedInCrm === null ? null : (summary.interestedInCrm ? 'yes' : 'no')) +
+      stat('Sales team size', summary.salesTeamSize) +
+      stat('Wants demo', summary.wantsDemo === null ? null : (summary.wantsDemo ? 'yes' : 'no')) +
+      stat('Lead handling today', summary.leadManagementMethod, true) +
+      `</div><div class="summary-text">${escapeHtml(summary.summary || 'No summary yet.')}</div>`;
+  }
+
+  el('refreshSummaryBtn').onclick = () =>
+    loadSummary().catch(e => setStatus(callStatus, e.message, 'error'));
+
+  el('loadHistoryBtn').onclick = async () => {
+    try {
+      const history = await api('/api/calls/' + activeCallId + '/conversation');
+      clearMessages();
+      history.messages.forEach(message => addBubble(message.speakerType, message.messageText));
+      setStatus(callStatus, `Loaded ${history.messages.length} stored messages.`, 'ok');
+    } catch (e) {
+      setStatus(callStatus, e.message, 'error');
+    }
+  };
+
+  setComposerEnabled(false);
+  checkSpeechConfig();
+  refreshLeads().then(openSelectedLead);
+</script>
+</body>
+</html>

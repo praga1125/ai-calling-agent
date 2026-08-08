@@ -5,6 +5,7 @@
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/AudioController.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/CallController.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/DashboardController.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/FollowUpController.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/LeadController.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/controller/SpeechController.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/CallSummaryResponse.java
@@ -16,6 +17,8 @@
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/CustomerTextRequest.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/DashboardResponse.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/ErrorResponse.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/FollowUpRequest.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/FollowUpResponse.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/LeadCallSummary.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/LeadDetailResponse.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/LeadResponse.java
@@ -25,11 +28,13 @@
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/dto/UpdateLeadRequest.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/entity/CallRecord.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/entity/ConversationMessage.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/entity/FollowUp.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/entity/Lead.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/CallOutcome.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/CallStatus.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/ConversationStep.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/CustomerInputMode.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/FollowUpStatus.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/LeadStatus.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/enums/SpeakerType.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/exception/BadRequestException.java
@@ -39,10 +44,13 @@
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/repository/CallRecordRepository.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/repository/ConversationMessageRepository.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/repository/EnumCount.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/repository/FollowUpRepository.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/repository/LeadRepository.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/scheduler/FollowUpScheduler.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/AudioStorageService.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/CallService.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/DashboardService.java
+/home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/FollowUpService.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/LeadService.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/SpeechDiagnosticsService.java
 /home/pragadeeshwaran/ai-calling-agent/src/main/java/com/flowzo/callingagent/service/audio/AudioMimeTypes.java

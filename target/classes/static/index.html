@@ -54,6 +54,30 @@
       margin-bottom: 16px;
     }
 
+    .followup-alert {
+      display: none;
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      font-size: .85rem;
+      margin-bottom: 16px;
+      border: 1px solid transparent;
+    }
+    .followup-alert.on { display: block; }
+    .followup-alert.soon {
+      border-color: rgba(74, 144, 226, .45);
+      background: rgba(74, 144, 226, .12);
+      color: #9ac4f5;
+    }
+    .followup-alert.due {
+      border-color: rgba(227, 93, 106, .45);
+      background: rgba(227, 93, 106, .12);
+      color: #f19aa2;
+    }
+    .followup-alert strong { font-weight: 700; }
+    .remain.soon { color: #9ac4f5; font-weight: 600; }
+    .remain.due { color: #f19aa2; font-weight: 700; }
+    .remain.ok { color: var(--muted); }
+
     /* ---------- layout ---------- */
 
     .layout {
@@ -327,6 +351,10 @@
     }
     .badge.CONTACTED { background: rgba(74, 144, 226, .16); color: #9ac4f5; }
     .badge.QUALIFIED { background: rgba(74, 144, 226, .28); color: #bcd9fb; }
+    .badge.PENDING { background: rgba(74, 144, 226, .16); color: #9ac4f5; }
+    .badge.COMPLETED { background: rgba(43, 182, 115, .16); color: #6ee7a8; }
+    .badge.CANCELLED { background: var(--card-2); color: var(--muted); }
+    .badge.MISSED { background: rgba(227, 93, 106, .16); color: #f19aa2; }
     .badge.CONVERTED { background: rgba(43, 182, 115, .18); color: #6ee7a8; }
     .badge.DISQUALIFIED { background: rgba(227, 93, 106, .16); color: #f19aa2; }
 
@@ -368,6 +396,7 @@
   </header>
 
   <div class="warning" id="speechWarning" hidden></div>
+  <div class="followup-alert" id="followUpAlert" role="alert" aria-live="polite"></div>
 
   <section class="card" style="margin-bottom:16px">
     <h2>Pipeline</h2>
@@ -435,6 +464,22 @@
         <button class="btn danger" id="deleteLeadBtn">Delete lead</button>
         <p class="status" id="leadStatus"></p>
       </div>
+
+      <hr class="sep" />
+
+      <h2>Follow-up</h2>
+      <div class="stack">
+        <div>
+          <label for="followUpAt">Schedule at</label>
+          <input type="datetime-local" id="followUpAt" />
+        </div>
+        <div>
+          <label for="followUpNotes">Notes</label>
+          <input id="followUpNotes" placeholder="Callback requested, try after lunch…" />
+        </div>
+        <button class="btn subtle" id="scheduleFollowUpBtn">Schedule follow-up</button>
+        <p class="status" id="followUpStatus"></p>
+      </div>
     </aside>
 
     <section class="card">
@@ -479,6 +524,29 @@
     <h2>Call summary and outcome</h2>
     <div id="summaryBox"><p class="placeholder">The summary appears when a call ends, or press “Load summary”.</p></div>
   </section>
+
+  <section class="card" style="margin-top:16px">
+    <h2>Follow-ups</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Lead</th>
+            <th>Customer</th>
+            <th>Phone</th>
+            <th>Scheduled</th>
+            <th>Remaining</th>
+            <th>Status</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="followUpRows"></tbody>
+      </table>
+    </div>
+    <p class="status" id="followUpTableStatus"></p>
+  </section>
 </main>
 
 <script>
@@ -500,7 +568,12 @@
   let meterTimer = null;
   let pendingAudioFile = null;
   let leads = [];
+  let followUps = [];
   let statusFilter = null;
+  const followUpStatus = el('followUpStatus');
+  const FOLLOW_UP_SOON_MS = 15 * 60 * 1000;
+  const followUpAlerted = new Set();
+  let followUpTickTimer = null;
 
   // Voice detection works on ratios, not absolute loudness, because microphone gain varies wildly.
   // Speech stands well above the room's noise floor and lasts; a click is loud but over in 60 ms.
@@ -738,12 +811,256 @@
       el('startCallBtn').disabled = none;
       el('deleteLeadBtn').disabled = none;
       el('updateLeadBtn').disabled = none;
+      el('scheduleFollowUpBtn').disabled = none;
       renderLeadRows();
       await showLeadDetail();
+      await refreshFollowUps();
     } catch (e) {
       setStatus(leadStatus, 'Could not load leads: ' + e.message, 'error');
     }
   }
+
+  /* ---------- follow-ups ---------- */
+
+  function defaultFollowUpLocalValue() {
+    const when = new Date(Date.now() + 60 * 60 * 1000);
+    when.setMinutes(when.getMinutes() - when.getTimezoneOffset());
+    return when.toISOString().slice(0, 16);
+  }
+
+  function toApiDateTime(localValue) {
+    if (!localValue) return null;
+    const date = new Date(localValue);
+    if (Number.isNaN(date.getTime())) return null;
+    const pad = n => String(n).padStart(2, '0');
+    return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate())
+      + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+  }
+
+  function formatFollowUpWhen(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  }
+
+  function followUpMsLeft(item) {
+    if (!item || !item.scheduledAt || item.status !== 'PENDING') return null;
+    const when = new Date(item.scheduledAt);
+    if (Number.isNaN(when.getTime())) return null;
+    return when.getTime() - Date.now();
+  }
+
+  function formatRemaining(ms) {
+    if (ms == null) return { text: '—', kind: '' };
+    const abs = Math.abs(ms);
+    const totalSec = Math.floor(abs / 1000);
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    let span;
+    if (days > 0) span = days + 'd ' + hours + 'h';
+    else if (hours > 0) span = hours + 'h ' + mins + 'm';
+    else if (mins > 0) span = mins + 'm ' + secs + 's';
+    else span = secs + 's';
+
+    if (ms <= 0) return { text: 'due now' + (abs >= 1000 ? ' · overdue ' + span : ''), kind: 'due' };
+    if (ms <= FOLLOW_UP_SOON_MS) return { text: 'in ' + span, kind: 'soon' };
+    return { text: 'in ' + span, kind: 'ok' };
+  }
+
+  function ensureFollowUpNotifyPermission() {
+    if (!('Notification' in window) || Notification.permission !== 'default') return;
+    Notification.requestPermission().catch(() => {});
+  }
+
+  function notifyFollowUp(item, kind) {
+    const key = item.id + ':' + kind;
+    if (followUpAlerted.has(key)) return;
+    followUpAlerted.add(key);
+    const title = kind === 'due'
+      ? 'Follow-up is due'
+      : 'Follow-up coming up';
+    const body = (item.customerName || ('Lead #' + item.leadId))
+      + ' · ' + formatFollowUpWhen(item.scheduledAt)
+      + (item.notes ? ' · ' + item.notes : '');
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        new Notification(title, { body, tag: 'follow-up-' + item.id });
+      } catch (_) { /* ignore */ }
+    }
+  }
+
+  function updateFollowUpAlerts() {
+    const pending = followUps
+      .filter(item => item.status === 'PENDING')
+      .map(item => ({ item, ms: followUpMsLeft(item) }))
+      .filter(entry => entry.ms != null)
+      .sort((a, b) => a.ms - b.ms);
+
+    const banner = el('followUpAlert');
+    banner.removeAttribute('style');
+    if (!pending.length) {
+      banner.className = 'followup-alert';
+      banner.textContent = '';
+      return;
+    }
+
+    const due = pending.filter(entry => entry.ms <= 0);
+    const soon = pending.filter(entry => entry.ms > 0 && entry.ms <= FOLLOW_UP_SOON_MS);
+
+    due.forEach(entry => notifyFollowUp(entry.item, 'due'));
+    soon.forEach(entry => notifyFollowUp(entry.item, 'soon'));
+
+    if (due.length) {
+      const first = due[0].item;
+      banner.className = 'followup-alert on due';
+      banner.innerHTML = '<strong>Follow-up due:</strong> '
+        + escapeHtml(first.customerName || ('Lead #' + first.leadId))
+        + ' was scheduled for ' + escapeHtml(formatFollowUpWhen(first.scheduledAt))
+        + (due.length > 1 ? ` · +${due.length - 1} more overdue` : '')
+        + '. The AI call should start shortly.';
+      return;
+    }
+
+    if (soon.length) {
+      const first = soon[0];
+      const remain = formatRemaining(first.ms);
+      banner.className = 'followup-alert on soon';
+      banner.innerHTML = '<strong>Upcoming follow-up:</strong> '
+        + escapeHtml(first.item.customerName || ('Lead #' + first.item.leadId))
+        + ' ' + escapeHtml(remain.text)
+        + ' (' + escapeHtml(formatFollowUpWhen(first.item.scheduledAt)) + ')'
+        + (soon.length > 1 ? ` · +${soon.length - 1} more soon` : '');
+      return;
+    }
+
+    const next = pending[0];
+    const remain = formatRemaining(next.ms);
+    banner.className = 'followup-alert on soon';
+    banner.innerHTML = '<strong>Next follow-up:</strong> '
+      + escapeHtml(next.item.customerName || ('Lead #' + next.item.leadId))
+      + ' ' + escapeHtml(remain.text)
+      + ' (' + escapeHtml(formatFollowUpWhen(next.item.scheduledAt)) + ')';
+  }
+
+  function tickFollowUpRemaining() {
+    el('followUpRows').querySelectorAll('[data-remain]').forEach(cell => {
+      const item = followUps.find(f => String(f.id) === cell.dataset.remain);
+      const remain = formatRemaining(followUpMsLeft(item));
+      cell.textContent = remain.text;
+      cell.className = 'remain ' + (remain.kind || 'ok');
+    });
+    updateFollowUpAlerts();
+  }
+
+  function renderFollowUpRows() {
+    el('followUpRows').innerHTML = followUps.length === 0
+      ? `<tr><td class="empty-row" colspan="9">No follow-ups yet — schedule one from the selected lead.</td></tr>`
+      : followUps.map(item => {
+        const remain = formatRemaining(followUpMsLeft(item));
+        return `
+        <tr data-id="${item.id}">
+          <td class="muted">${item.id}</td>
+          <td class="muted">#${item.leadId}</td>
+          <td>${escapeHtml(item.customerName || '—')}</td>
+          <td class="muted">${escapeHtml(item.phoneNumber || '—')}</td>
+          <td class="muted">${escapeHtml(formatFollowUpWhen(item.scheduledAt))}</td>
+          <td class="remain ${remain.kind || 'ok'}" data-remain="${item.id}">${escapeHtml(remain.text)}</td>
+          <td><span class="badge ${item.status}">${item.status.toLowerCase()}</span></td>
+          <td class="muted">${escapeHtml(item.notes || '—')}</td>
+          <td class="right">
+            ${item.status === 'PENDING'
+              ? `<button class="btn subtle" data-cancel="${item.id}">Cancel</button>
+                 <button class="btn danger" data-delete="${item.id}">Delete</button>`
+              : `<button class="btn danger" data-delete="${item.id}">Delete</button>`}
+          </td>
+        </tr>`;
+      }).join('');
+
+    const pending = followUps.filter(item => item.status === 'PENDING').length;
+    setStatus(el('followUpTableStatus'),
+      `${followUps.length} follow-up${followUps.length === 1 ? '' : 's'}`
+      + (pending ? ` · ${pending} pending` : ''));
+
+    el('followUpRows').querySelectorAll('button[data-cancel]').forEach(button => {
+      button.onclick = async event => {
+        event.stopPropagation();
+        try {
+          await api('/api/follow-ups/' + button.dataset.cancel + '/cancel', { method: 'POST' });
+          setStatus(followUpStatus, `Follow-up #${button.dataset.cancel} cancelled`, 'ok');
+          await refreshFollowUps();
+        } catch (e) {
+          setStatus(followUpStatus, e.message, 'error');
+        }
+      };
+    });
+    el('followUpRows').querySelectorAll('button[data-delete]').forEach(button => {
+      button.onclick = async event => {
+        event.stopPropagation();
+        if (!confirm(`Delete follow-up #${button.dataset.delete}?`)) return;
+        try {
+          await api('/api/follow-ups/' + button.dataset.delete, { method: 'DELETE' });
+          setStatus(followUpStatus, `Follow-up #${button.dataset.delete} deleted`, 'ok');
+          await refreshFollowUps();
+        } catch (e) {
+          setStatus(followUpStatus, e.message, 'error');
+        }
+      };
+    });
+    el('followUpRows').querySelectorAll('tr[data-id]').forEach(row => {
+      row.onclick = () => {
+        const item = followUps.find(f => String(f.id) === row.dataset.id);
+        if (item) selectLead(item.leadId);
+      };
+    });
+
+    updateFollowUpAlerts();
+  }
+
+  async function refreshFollowUps() {
+    try {
+      followUps = await api('/api/follow-ups');
+      const activeIds = new Set(followUps.filter(f => f.status === 'PENDING').map(f => String(f.id)));
+      [...followUpAlerted].forEach(key => {
+        if (!activeIds.has(key.split(':')[0])) followUpAlerted.delete(key);
+      });
+      renderFollowUpRows();
+    } catch (e) {
+      setStatus(el('followUpTableStatus'), 'Could not load follow-ups: ' + e.message, 'error');
+    }
+  }
+
+  el('scheduleFollowUpBtn').onclick = async () => {
+    const leadId = el('leadSelect').value;
+    if (!leadId) {
+      setStatus(followUpStatus, 'Select a lead first.', 'error');
+      return;
+    }
+    const scheduledAt = toApiDateTime(el('followUpAt').value);
+    if (!scheduledAt) {
+      setStatus(followUpStatus, 'Pick a date and time for the follow-up.', 'error');
+      return;
+    }
+    try {
+      ensureFollowUpNotifyPermission();
+      const created = await api('/api/follow-ups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId: Number(leadId),
+          scheduledAt,
+          notes: el('followUpNotes').value || null
+        })
+      });
+      el('followUpNotes').value = '';
+      el('followUpAt').value = defaultFollowUpLocalValue();
+      setStatus(followUpStatus, `Scheduled follow-up #${created.id}`, 'ok');
+      await refreshFollowUps();
+    } catch (e) {
+      setStatus(followUpStatus, e.message, 'error');
+    }
+  };
 
   async function showLeadDetail() {
     const leadId = el('leadSelect').value;
@@ -1342,6 +1659,15 @@
   };
 
   setComposerEnabled(false);
+  el('followUpAt').value = defaultFollowUpLocalValue();
+  ensureFollowUpNotifyPermission();
+  if (followUpTickTimer) clearInterval(followUpTickTimer);
+  followUpTickTimer = setInterval(() => {
+    tickFollowUpRemaining();
+  }, 1000);
+  setInterval(() => {
+    if (followUps.some(item => item.status === 'PENDING')) refreshFollowUps();
+  }, 30_000);
   checkSpeechConfig();
   refreshLeads().then(openSelectedLead);
 </script>

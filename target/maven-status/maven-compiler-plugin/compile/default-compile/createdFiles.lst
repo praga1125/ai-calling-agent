@@ -6,6 +6,8 @@ com/flowzo/callingagent/dto/LeadCallSummary.class
 com/flowzo/callingagent/service/stt/ChatAudioSpeechToTextService$Attempt.class
 com/flowzo/callingagent/service/stt/OpenAiSpeechToTextService$1.class
 com/flowzo/callingagent/controller/AudioController.class
+com/flowzo/callingagent/repository/FollowUpRepository.class
+com/flowzo/callingagent/service/FollowUpService.class
 com/flowzo/callingagent/controller/CallController.class
 com/flowzo/callingagent/dto/CreateLeadRequest.class
 com/flowzo/callingagent/service/openai/OpenAiClient$QuotaExceededException.class
@@ -26,7 +28,9 @@ com/flowzo/callingagent/dto/LeadResponse.class
 com/flowzo/callingagent/config/AppProperties$Storage.class
 com/flowzo/callingagent/entity/CallRecord.class
 com/flowzo/callingagent/exception/BadRequestException.class
+com/flowzo/callingagent/controller/FollowUpController.class
 com/flowzo/callingagent/dto/UpdateLeadRequest.class
+com/flowzo/callingagent/dto/FollowUpRequest.class
 com/flowzo/callingagent/service/audio/WavDiagnostics.class
 com/flowzo/callingagent/enums/SpeakerType.class
 com/flowzo/callingagent/dto/LeadDetailResponse.class
@@ -44,6 +48,7 @@ com/flowzo/callingagent/service/tts/OpenAiTextToSpeechService$1.class
 com/flowzo/callingagent/service/DashboardService.class
 com/flowzo/callingagent/dto/CustomerTextRequest.class
 com/flowzo/callingagent/entity/Lead.class
+com/flowzo/callingagent/entity/FollowUp.class
 com/flowzo/callingagent/exception/SpeechServiceException.class
 com/flowzo/callingagent/service/openai/OpenAiClient$MissingApiKeyException.class
 com/flowzo/callingagent/service/CallService.class
@@ -52,12 +57,15 @@ com/flowzo/callingagent/service/stt/OpenAiSpeechToTextService.class
 com/flowzo/callingagent/service/stt/SpeechToTextService.class
 com/flowzo/callingagent/repository/EnumCount.class
 com/flowzo/callingagent/dto/ConversationHistoryResponse.class
+com/flowzo/callingagent/scheduler/FollowUpScheduler.class
+com/flowzo/callingagent/enums/FollowUpStatus.class
 com/flowzo/callingagent/dto/ConversationMessageResponse.class
 com/flowzo/callingagent/enums/CallStatus.class
 com/flowzo/callingagent/dto/StartCallResponse.class
 com/flowzo/callingagent/config/AppProperties.class
 com/flowzo/callingagent/repository/ConversationMessageRepository.class
 com/flowzo/callingagent/dto/CallSummaryResponse.class
+com/flowzo/callingagent/dto/FollowUpResponse.class
 com/flowzo/callingagent/service/openai/OpenAiClient.class
 com/flowzo/callingagent/service/LeadService.class
 com/flowzo/callingagent/dto/SpeechStatusResponse.class
